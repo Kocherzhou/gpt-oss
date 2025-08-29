@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>俄罗斯方块 - Tetris (Skins + Leaderboard + Touch)</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
+         background:#1a1a2e;display:flex;justify-content:center;align-items:center;
+         min-height:100vh;color:white;}
+    .game-container{display:flex; flex-wrap:wrap; gap:20px; padding:20px; background:#0f0f1e;
+         border-radius:20px; box-shadow:0 8px 32px rgba(0,0,0,0.5); max-width:1100px;
+         justify-content:center; align-items:flex-start;}
+    .game-and-primary-wrapper{display:flex; gap:20px; flex-wrap:wrap; justify-content:center;}
+    .game-board{position:relative; flex-shrink:0;}
+    canvas{border:2px solid #2a2a3e; border-radius:10px; background:#000;
+         box-shadow:inset 0 0 20px rgba(0,0,0,0.8); display:block;}
+    .primary-info, .secondary-info{display:flex; flex-direction:column; gap:15px;}
+    .primary-info{width:240px;}
+    .secondary-info{width:240px; flex-grow: 1;}
+    .info-box{background:#16213e; padding:15px; border-radius:10px; border:1px solid #2a2a3e;}
+    .info-box h3{margin-bottom:10px; font-size:14px; text-transform:uppercase; opacity:0.8;}
+    .info-box .value{font-size:24px; font-weight:bold;}
+    .score-hint{font-size:12px; opacity:0.7; margin-top:5px;}
+    #nextPiece{width:120px; height:120px; background:#000; border-radius:10px;
+         margin-top:10px; border:1px solid #2a2a3e;}
+    .controls{background:#16213e; padding:15px; border-radius:10px; border:1px solid #2a2a3e;}
+    .controls h3{margin-bottom:15px; font-size:14px; text-transform:uppercase; opacity:0.8;}
+    .control-item{display:flex; justify-content:space-between; margin-bottom:8px; font-size:14px;}
+    .key{background:rgba(255,255,255,0.2); padding:2px 8px; border-radius:4px; font-family:monospace;}
+    button{padding:10px 12px; background:#4a69bd; color:white; border:none; border-radius:10px;
+         font-size:14px; font-weight:600; cursor:pointer; transition:transform 0.2s,background 0.2s;}
+    button:hover{transform:translateY(-2px); background:#5f7cdb;}
+    button:active{transform:translateY(0);}
+    #playButton{width:100%; padding:12px; font-size:16px;}
+    .game-over{position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+         background:rgba(0,0,0,0.9); padding:30px; border-radius:15px; text-align:center; display:none; width:80%; max-width:320px;}
+    .game-over.show{display:block;}
+    .game-over h2{margin-bottom:16px; font-size:28px;}
+    .row{display:flex; gap:10px; align-items:center; flex-wrap:wrap;}
+    select{flex:1; padding:8px; border-radius:8px; border:1px solid #2a2a3e; background:#0b1530; color:#fff;}
+    .leaderboard{list-style:decimal inside; margin:0; padding:0;}
+    .leaderboard li{display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed rgba(255,255,255,0.1); font-size:13px;}
+    .touch-controls{display:none; gap:10px; margin-top:12px; flex-wrap:wrap;}
+    .touch-controls button{flex:1; min-width:90px}
+    @media(max-width:850px){
+      .secondary-info{width:100%;}
+    }
+    @media(max-width:600px){
+      .game-and-primary-wrapper{gap:15px;}
+      .primary-info{width:100%; order: -1;}
+      .game-board{margin:0 auto;} /* 在主包装内居中 */
+      .touch-controls{display:flex;}
+    }
+  </style>
+</head>
+<body>
+  <div class="game-container">
+    <div class="game-and-primary-wrapper">
+      <div class="game-board">
+        <canvas id="gameCanvas" width="300" height="600"></canvas>
+        <div class="game-over" id="gameOver">
+          <h2>游戏结束</h2>
+          <p id="gameOverMessage">最终得分: <span id="finalScore">0</span></p>
+          <div class="row" style="margin-top:10px">
+            <input id="playerName" placeholder="输入昵称保存成绩" style="flex:1;padding:8px;border-radius:8px;border:1px solid #2a2a3e;background:#0b1530;color:#fff;">
+            <button id="saveScoreBtn">保存成绩</button>
+          </div>
+        </div>
+        <!-- 触控按钮（移动端自动显示） -->
+        <div class="touch-controls">
+          <button id="btnLeft">← 左移</button>
+          <button id="btnRotate">⟳ 旋转</button>
+          <button id="btnRight">→ 右移</button>
+          <button id="btnSoft">↓ 加速</button>
+          <button id="btnHard">⇣ 直落</button>
+        </div>
+      </div>
+
+      <div class="primary-info">
+        <div class="info-box">
+          <h3>下一个方块</h3>
+          <canvas id="nextPiece" width="120" height="120"></canvas>
+        </div>
+        <button id="playButton">开始游戏</button>
+        <div class="info-box">
+          <h3>最高分</h3><div class="value" id="highScore">0</div>
+        </div>
+      <div class="info-box">
+        <h3>得分</h3><div class="value" id="score">0</div>
+        <div class="score-hint">1排×1 | 2排×2 | 3排×3 | 4排×4</div>
+      </div>
+      <div class="info-box"><h3>等级</h3><div class="value" id="level">1</div></div>
+      <div class="info-box"><h3>消除行数</h3><div class="value" id="lines">0</div></div>
+      </div>
+    </div>
+
+    <div class="secondary-info">
+      <div class="info-box">
+        <h3>音效与皮肤</h3>
+        <div class="row" style="margin-bottom:8px">
+          <button id="toggleSound">🔊 音效</button>
+          <button id="toggleMusic">🎵 音乐</button>
+        </div>
+        <div class="row">
+          <label for="skinSelect" style="opacity:.8;font-size:13px">皮肤：</label>
+          <select id="skinSelect">
+            <option value="classic">经典</option>
+            <option value="neon">霓虹</option>
+            <option value="sakura">夜樱</option>
+            <option value="gb">复古GB</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="info-box">
+        <h3>排行榜 Top 10</h3>
+        <ol id="leaderboard" class="leaderboard"></ol>
+        <div class="row" style="margin-top:8px">
+          <button id="clearBoardBtn" style="background:#8a3b3b">清空榜单</button>
+        </div>
+      </div>
+
+      <div class="controls">
+        <h3>操作说明</h3>
+        <div class="control-item"><span>左移</span><span class="key">← 或 触控按钮</span></div>
+        <div class="control-item"><span>右移</span><span class="key">→ 或 触控按钮</span></div>
+        <div class="control-item"><span>旋转</span><span class="key">↑ / 轻点画布</span></div>
+        <div class="control-item"><span>加速</span><span class="key">↓ / 下滑</span></div>
+        <div class="control-item"><span>直落</span><span class="key">Space / 上滑</span></div>
+        <div class="control-item"><span>暂停</span><span class="key">P</span></div>
+      </div>
+    </div>
+  </div>
+<script>
+    /* ---------- 皮肤定义 ---------- */
+    const SKINS = {
+      classic: { name:'经典', bg:'#000', grid:'rgba(255,255,255,0.06)', colors:['#00f0f0','#f0f000','#a000f0','#00f000','#f00000','#0000f0','#f0a000'] },
+      neon:    { name:'霓虹', bg:'#01030f', grid:'rgba(0,255,255,0.12)',   colors:['#39FF14','#FFD700','#DA70D6','#7CFC00','#FF4D4D','#1E90FF','#FFA500'] },
+      sakura:  { name:'夜樱', bg:'#0c0a1a', grid:'rgba(255,182,193,0.12)', colors:['#F472B6','#FDE68A','#C4B5FD','#86EFAC','#FB7185','#93C5FD','#F59E0B'] },
+      gb:      { name:'复古GB', bg:'#0a1f0a', grid:'rgba(136,170,102,0.15)', colors:['#88AA66','#A3C27E','#7BA66B','#5C8A57','#8FBF5B','#6C9E40','#B7D67A'] }
+    };
+
+    /* ---------- 音效与背景音乐（纯 Web Audio） ---------- */
+    class AudioSystem{
+      constructor(){
+        this.audioContext=null;
+        this.soundEnabled=true;
+        this.musicEnabled=true;
+        this.musicPlaying=false;
+      }
+      init(){ if(!this.audioContext){ this.audioContext=new (window.AudioContext||window.webkitAudioContext)(); } }
+      playSound(type){
+        if(!this.soundEnabled||!this.audioContext) return;
+        const t=this.audioContext.currentTime;
+        const osc=this.audioContext.createOscillator(), g=this.audioContext.createGain();
+        osc.connect(g); g.connect(this.audioContext.destination);
+        switch(type){
+          case'move':    osc.frequency.value=200; g.gain.value=0.1;  osc.start(t); osc.stop(t+0.05); break;
+          case'rotate':  osc.frequency.value=300; g.gain.value=0.1;  osc.start(t); osc.stop(t+0.05); break;
+          case'drop':    osc.frequency.value=110; g.gain.value=0.15; osc.start(t); osc.stop(t+0.10); break;
+          case'clear':   osc.type='square'; osc.frequency.setValueAtTime(800,t);
+                         osc.frequency.exponentialRampToValueAtTime(400,t+0.2);
+                         g.gain.value=0.2; osc.start(t); osc.stop(t+0.2); break;
+          case'tetris':  for(let i=0;i<3;i++){ const o=this.audioContext.createOscillator(), gg=this.audioContext.createGain();
+                           o.connect(gg); gg.connect(this.audioContext.destination);
+                           o.frequency.value=400+i*200; gg.gain.value=0.15;
+                           o.start(t+i*0.1); o.stop(t+i*0.1+0.1); }
+                         break;
+          case'gameover':osc.type='sawtooth'; osc.frequency.setValueAtTime(400,t);
+                         osc.frequency.exponentialRampToValueAtTime(100,t+0.5);
+                         g.gain.value=0.3; osc.start(t); osc.stop(t+0.5); break;
+          case'levelup': const o1=this.audioContext.createOscillator(), o2=this.audioContext.createOscillator(),
+                         g1=this.audioContext.createGain(), g2=this.audioContext.createGain();
+                         o1.connect(g1); o2.connect(g2); g1.connect(this.audioContext.destination); g2.connect(this.audioContext.destination);
+                         o1.frequency.value=523; o2.frequency.value=659; g1.gain.value=0.15; g2.gain.value=0.15;
+                         o1.start(t); o2.start(t+0.1); o1.stop(t+0.2); o2.stop(t+0.3); break;
+        }
+      }
+      playMusic(){ if(!this.musicEnabled||!this.audioContext||this.musicPlaying) return; this.musicPlaying=true; this._loop(); }
+      _loop(){
+        if(!this.musicPlaying||!this.musicEnabled) return;
+        const tempo=120, beat=60/tempo, bar=beat*4;
+        const melody=[[440,0.25],[330,0.25],[370,0.25],[440,0.25],[370,0.25],[330,0.25],[294,0.25],[294,0.25]];
+        const t=this.audioContext.currentTime; let off=0;
+        melody.forEach(([f,d])=>{
+          const o=this.audioContext.createOscillator(), g=this.audioContext.createGain();
+          o.connect(g); g.connect(this.audioContext.destination);
+          o.type='triangle'; o.frequency.value=f; g.gain.value=0.05;
+          o.start(t+off); o.stop(t+off+d*beat); off+=d*beat;
+        });
+        if(this.musicPlaying&&this.musicEnabled) setTimeout(()=>this._loop(), bar*1000);
+      }
+      stopMusic(){ this.musicPlaying=false; }
+      toggleSound(){ this.soundEnabled=!this.soundEnabled; return this.soundEnabled; }
+      toggleMusic(){ this.musicEnabled=!this.musicEnabled; if(!this.musicEnabled) this.stopMusic(); else if(!this.musicPlaying) this.playMusic(); return this.musicEnabled; }
+    }
+
+    /* ---------- 基础引用 ---------- */
+    const COLS=10, ROWS=20, BLOCK=30;
+    const SHAPES=[[[1,1,1,1]], [[1,1],[1,1]], [[0,1,0],[1,1,1]], [[0,1,1],[1,1,0]], [[1,1,0],[0,1,1]], [[1,0,0],[1,1,1]], [[0,0,1],[1,1,1]]];
+
+    const canvas=document.getElementById('gameCanvas'), ctx=canvas.getContext('2d');
+    const nextCanvas=document.getElementById('nextPiece'), nextCtx=nextCanvas.getContext('2d');
+    const playBtn=document.getElementById('playButton');
+    const skinSelect=document.getElementById('skinSelect');
+
+    /* ---------- 排行榜工具 ---------- */
+    function loadBoard(){ try{ return JSON.parse(localStorage.getItem('tetrisLeaderboard')||'[]'); }catch(e){ return []; } }
+    function saveBoard(arr){ localStorage.setItem('tetrisLeaderboard', JSON.stringify(arr)); }
+    function renderBoard(){
+      const list=document.getElementById('leaderboard'); list.innerHTML='';
+      const data=loadBoard();
+      data.forEach((e,i)=>{
+        const li=document.createElement('li');
+        li.innerHTML=`<span>${i+1}. ${e.name||'玩家'}</span><span>${e.score}</span>`;
+        list.appendChild(li);
+      });
+      if(data.length===0){
+        const li=document.createElement('li'); li.style.listStyle='none'; li.style.opacity='.7';
+        li.textContent='暂无记录'; list.appendChild(li);
+      }
+    }
+
+    /* ---------- 核心 Game 类（支持换肤/连锁消除/重新开始/画布清理） ---------- */
+    class Game{
+      constructor(){
+        this.audio=new AudioSystem();
+        this.highScore=parseInt(localStorage.getItem('tetrisHighScore')||'0',10);
+        this.ani=null;
+        this.skinKey=localStorage.getItem('tetrisSkin')||'classic';
+        this.palette=SKINS[this.skinKey].colors;
+        this.bgColor=SKINS[this.skinKey].bg;
+        this.gridColor=SKINS[this.skinKey].grid;
+
+        this.reset();
+        this.updateHigh();
+        this.clearCanvases();
+        this.render();
+        skinSelect.value=this.skinKey;
+      }
+
+      setSkin(key){
+        if(!SKINS[key]) return;
+        this.skinKey=key;
+        localStorage.setItem('tetrisSkin', key);
+        this.palette=SKINS[key].colors;
+        this.bgColor=SKINS[key].bg;
+        this.gridColor=SKINS[key].grid;
+        // 立即清空并重绘
+        this.clearCanvases();
+        this.render();
+      }
+
+      reset(){
+        // 棋盘：0=空，1..7=方块类型索引+1（用于按皮肤着色）
+        this.board=Array(ROWS).fill().map(()=>Array(COLS).fill(0));
+        this.score=0; this.lines=0; this.level=1;
+        this.dropInterval=1000; this.dropCounter=0; this.last=0;
+        this.gameOver=false; this.paused=false;
+        this.current=null; this.next=null;
+        this.clearing=[]; this.clearTime=0; this.clearDur=500;
+      }
+
+      clearCanvases(){
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+        ctx.fillStyle=this.bgColor; ctx.fillRect(0,0,canvas.width,canvas.height);
+        nextCtx.clearRect(0,0,nextCanvas.width,nextCanvas.height);
+        nextCtx.fillStyle=this.bgColor; nextCtx.fillRect(0,0,nextCanvas.width,nextCanvas.height);
+      }
+
+      start(){
+        // 重新开始：停止旧循环、重置数据、立即清画布
+        if(this.ani){ cancelAnimationFrame(this.ani); this.ani=null; }
+        this.reset();
+        this.current=this.newPiece(); this.next=this.newPiece();
+        this.updateUI();
+        this.clearCanvases(); this.render();
+        document.getElementById('gameOver').classList.remove('show');
+        playBtn.textContent='重新开始';
+        this.audio.init(); this.audio.playMusic();
+        this.loop();
+      }
+
+      newPiece(){
+        const t=Math.floor(Math.random()*SHAPES.length);
+        return { shape:SHAPES[t], type:t, x:Math.floor((COLS-SHAPES[t][0].length)/2), y:0 };
+      }
+
+      rotateMatrix(sh){
+        const N=sh.length, M=sh[0].length, r=Array(M).fill().map(()=>Array(N).fill(0));
+        for(let i=0;i<N;i++) for(let j=0;j<M;j++) r[j][N-1-i]=sh[i][j];
+        return r;
+      }
+
+      collide(p,dx=0,dy=0,shape=null){
+        const sh=shape||p.shape;
+        for(let y=0;y<sh.length;y++) for(let x=0;x<sh[y].length;x++){
+          if(!sh[y][x]) continue;
+          const nx=p.x+x+dx, ny=p.y+y+dy;
+          if(nx<0||nx>=COLS||ny>=ROWS) return true;
+          if(ny>=0 && this.board[ny][nx]!==0) return true;
+        }
+        return false;
+      }
+
+      merge(){
+        for(let y=0;y<this.current.shape.length;y++)
+          for(let x=0;x<this.current.shape[y].length;x++)
+            if(this.current.shape[y][x]){
+              const by=this.current.y+y, bx=this.current.x+x;
+              if(by>=0) this.board[by][bx]=this.current.type+1; // 存编号用于皮肤着色
+            }
+        this.audio.playSound('drop');
+      }
+
+      anyFullLine(){ for(let y=0;y<ROWS;y++) if(this.board[y].every(c=>c!==0)) return true; return false; }
+
+      clear(){
+        const lines=[]; for(let y=0;y<ROWS;y++) if(this.board[y].every(c=>c!==0)) lines.push(y);
+        if(lines.length){
+          this.clearing=lines; this.clearTime=this.clearDur; this.paused=true;
+          this.audio.playSound(lines.length===4?'tetris':'clear');
+          setTimeout(()=>{
+            lines.sort((a,b)=>b-a);
+            for(const y of lines){ this.board.splice(y,1); this.board.unshift(Array(COLS).fill(0)); }
+            this.lines+=lines.length;
+            this.score+=100*this.level*lines.length*lines.length;
+            const newLv=Math.floor(this.lines/10)+1;
+            if(newLv>this.level){
+              this.level=newLv;
+              this.dropInterval=Math.max(50, 1000*Math.pow(0.85,this.level-1));
+              this.audio.playSound('levelup');
+            }
+            this.updateUI(); this.clearing=[]; this.paused=false;
+            // 关键：连锁消除，若仍有整行立刻再次清除
+            if(this.anyFullLine()) this.clear();
+          }, this.clearDur);
+        }
+      }
+
+      moveLeft(){  if(!this.collide(this.current,-1,0)){ this.current.x--; this.audio.playSound('move'); } }
+      moveRight(){ if(!this.collide(this.current, 1,0)){ this.current.x++; this.audio.playSound('move'); } }
+      moveDown(){
+        if(!this.collide(this.current,0,1)){ this.current.y++; this.score++; this.updateUI(); }
+        else{
+          this.merge(); this.clear();
+          this.current=this.next; this.next=this.newPiece();
+          if(this.collide(this.current,0,0)){
+            this.gameOver=true; this.audio.playSound('gameover'); this.audio.stopMusic();
+            const over=document.getElementById('gameOverMessage');
+            if(this.score>this.highScore){
+              this.highScore=this.score;
+              localStorage.setItem('tetrisHighScore', String(this.highScore));
+              over.textContent=`新纪录！最终得分: ${this.score}`;
+            }else over.textContent=`最终得分: ${this.score}`;
+            document.getElementById('finalScore').textContent=this.score;
+            document.getElementById('gameOver').classList.add('show');
+          }
+        }
+      }
+
+      hardDrop(){ while(!this.collide(this.current,0,1)){ this.current.y++; this.score+=2; } this.moveDown(); }
+
+      rotate(){
+        const r=this.rotateMatrix(this.current.shape);
+        if(!this.collide(this.current,0,0,r)){ this.current.shape=r; this.audio.playSound('rotate'); }
+        else if(!this.collide(this.current,-1,0,r)){ this.current.x--; this.current.shape=r; this.audio.playSound('rotate'); }
+        else if(!this.collide(this.current, 1,0,r)){ this.current.x++; this.current.shape=r; this.audio.playSound('rotate'); }
+      }
+
+      updateUI(){
+        document.getElementById('score').textContent=this.score;
+        document.getElementById('level').textContent=this.level;
+        document.getElementById('lines').textContent=this.lines;
+        this.updateHigh();
+      }
+      updateHigh(){ document.getElementById('highScore').textContent=this.highScore; }
+
+      drawBlock(g,x,y,typeIndex){
+        const color=this.palette[typeIndex]; // 0..6
+        g.fillStyle=color;
+        g.fillRect(x*BLOCK+1,y*BLOCK+1,BLOCK-2,BLOCK-2);
+        g.fillStyle='rgba(255,255,255,0.25)';
+        g.fillRect(x*BLOCK+1,y*BLOCK+1,BLOCK-2,2);
+        g.fillRect(x*BLOCK+1,y*BLOCK+1,2,BLOCK-2);
+        g.fillStyle='rgba(0,0,0,0.35)';
+        g.fillRect(x*BLOCK+BLOCK-3,y*BLOCK+1,2,BLOCK-2);
+        g.fillRect(x*BLOCK+1,y*BLOCK+BLOCK-3,BLOCK-2,2);
+      }
+
+      render(){
+        // 背景与网格
+        ctx.fillStyle=this.bgColor; ctx.fillRect(0,0,canvas.width,canvas.height);
+        ctx.strokeStyle=this.gridColor; ctx.lineWidth=1;
+        for(let i=1;i<COLS;i++){ ctx.beginPath(); ctx.moveTo(i*BLOCK,0); ctx.lineTo(i*BLOCK,canvas.height); ctx.stroke(); }
+        for(let i=1;i<ROWS;i++){ ctx.beginPath(); ctx.moveTo(0,i*BLOCK); ctx.lineTo(canvas.width,i*BLOCK); ctx.stroke(); }
+
+        // 固定方块
+        for(let y=0;y<ROWS;y++) for(let x=0;x<COLS;x++){
+          const v=this.board[y][x];
+          if(v!==0){
+            if(this.clearing.includes(y)){
+              const f=Math.sin(this.clearTime*0.02)*0.5+0.5;
+              ctx.save(); ctx.globalAlpha=f; this.drawBlock(ctx,x,y,(v-1)); ctx.restore();
+            }else{
+              this.drawBlock(ctx,x,y,(v-1));
+            }
+          }
+        }
+
+        // 当前方块
+        if(this.current && !this.clearing.length){
+          for(let y=0;y<this.current.shape.length;y++)
+            for(let x=0;x<this.current.shape[y].length;x++)
+              if(this.current.shape[y][x]) this.drawBlock(ctx,this.current.x+x,this.current.y+y,this.current.type);
+        }
+
+        // 下一方块
+        nextCtx.fillStyle=this.bgColor; nextCtx.fillRect(0,0,nextCanvas.width,nextCanvas.height);
+        if(this.next){
+          const s=24, ox=(nextCanvas.width-this.next.shape[0].length*s)/2, oy=(nextCanvas.height-this.next.shape.length*s)/2;
+          for(let y=0;y<this.next.shape.length;y++)
+            for(let x=0;x<this.next.shape[y].length;x++)
+              if(this.next.shape[y][x]){
+                nextCtx.fillStyle=this.palette[this.next.type];
+                nextCtx.fillRect(ox+x*s,oy+y*s,s-2,s-2);
+              }
+        }
+      }
+
+      update(dt){
+        if(this.gameOver) return;
+        if(this.clearTime>0) this.clearTime-=dt;
+        if(this.paused) return;
+        this.dropCounter+=dt;
+        if(this.dropCounter>this.dropInterval){ this.moveDown(); this.dropCounter=0; }
+      }
+
+      loop(t=0){
+        const dt=t-this.last; this.last=t;
+        this.update(dt); this.render();
+        this.ani=requestAnimationFrame(this.loop.bind(this));
+      }
+    }
+
+    const game=new Game();
+/* ---------- 键盘控制 ---------- */
+    document.addEventListener('keydown', (e) => {
+      if (game.gameOver || game.clearing.length) return;
+      switch (e.key) {
+        case 'ArrowLeft':  e.preventDefault(); game.moveLeft();  break;
+        case 'ArrowRight': e.preventDefault(); game.moveRight(); break;
+        case 'ArrowDown':  e.preventDefault(); game.moveDown();  break;
+        case 'ArrowUp':    e.preventDefault(); game.rotate();    break;
+        case ' ':          e.preventDefault(); game.hardDrop();  break;
+        case 'p':
+        case 'P':          e.preventDefault(); game.paused = !game.paused; break;
+      }
+    });
+
+    /* ---------- 触控与屏幕按钮（移动端） ---------- */
+    // 手势：轻点=旋转；左/右滑=移动；下滑=加速；上滑=直落
+    let touchStartX = 0, touchStartY = 0, touchTime = 0;
+    canvas.addEventListener('touchstart', (e) => {
+      const t = e.changedTouches[0];
+      touchStartX = t.clientX; touchStartY = t.clientY; touchTime = Date.now();
+    }, { passive: true });
+
+    canvas.addEventListener('touchend', (e) => {
+      if (game.gameOver || game.clearing.length) return;
+      const t  = e.changedTouches[0];
+      const dx = t.clientX - touchStartX;
+      const dy = t.clientY - touchStartY;
+      const adx = Math.abs(dx), ady = Math.abs(dy);
+      const dt = Date.now() - touchTime;
+      const SWIPE = 24, TAP = 12;
+
+      if (adx < TAP && ady < TAP && dt < 250) { game.rotate(); return; } // 轻点=旋转
+      if (adx > ady) {
+        if (dx >  SWIPE) game.moveRight();
+        if (dx < -SWIPE) game.moveLeft();
+      } else {
+        if (dy >  SWIPE) game.moveDown();  // 下滑=加速
+        if (dy < -SWIPE) game.hardDrop();  // 上滑=直落
+      }
+    }, { passive: true });
+
+    // 屏幕按钮（移动端自动显示）
+    const btnLeft  = document.getElementById('btnLeft');
+    const btnRight = document.getElementById('btnRight');
+    const btnRotate= document.getElementById('btnRotate');
+    const btnSoft  = document.getElementById('btnSoft');
+    const btnHard  = document.getElementById('btnHard');
+
+    if (btnLeft)  btnLeft.onclick  = () => { if (!game.gameOver && !game.clearing.length) game.moveLeft();  };
+    if (btnRight) btnRight.onclick = () => { if (!game.gameOver && !game.clearing.length) game.moveRight(); };
+    if (btnRotate)btnRotate.onclick= () => { if (!game.gameOver && !game.clearing.length) game.rotate();    };
+    if (btnSoft)  btnSoft.onclick  = () => { if (!game.gameOver && !game.clearing.length) game.moveDown();  };
+    if (btnHard)  btnHard.onclick  = () => { if (!game.gameOver && !game.clearing.length) game.hardDrop();  };
+
+    /* ---------- 顶部按钮与皮肤选择 ---------- */
+    document.getElementById('playButton').addEventListener('click', () => game.start());
+
+    document.getElementById('toggleSound').addEventListener('click', () => {
+      const on = game.audio.toggleSound();
+      document.getElementById('toggleSound').textContent = on ? '🔊 音效' : '🔇 音效';
+    });
+
+    document.getElementById('toggleMusic').addEventListener('click', () => {
+      const on = game.audio.toggleMusic();
+      document.getElementById('toggleMusic').textContent = on ? '🎵 音乐' : '🔇 音乐';
+    });
+
+    document.getElementById('skinSelect').addEventListener('change', (e) => {
+      game.setSkin(e.target.value);
+    });
+
+    /* ---------- 排行榜：渲染 / 保存 / 清空 ---------- */
+    function tryInsertScore(name, score) {
+      const arr = loadBoard();
+      arr.push({ name: name || '玩家', score, date: Date.now() });
+      arr.sort((a, b) => b.score - a.score);
+      saveBoard(arr.slice(0, 10));
+      renderBoard();
+    }
+
+    renderBoard();
+
+    document.getElementById('saveScoreBtn').addEventListener('click', () => {
+      if (!game.gameOver) return;
+      const name = (document.getElementById('playerName').value || '').trim() || '玩家';
+      tryInsertScore(name, game.score);
+      document.getElementById('playerName').value = '';
+    });
+
+    document.getElementById('clearBoardBtn').addEventListener('click', () => {
+      localStorage.removeItem('tetrisLeaderboard');
+      renderBoard();
+    });
+
+    // 初始化：显示高分
+    document.getElementById('highScore').textContent = game.highScore;
+  </script>
+</body>
+</html>
